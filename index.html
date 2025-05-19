@@ -1,0 +1,187 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShortLink - URL Shortener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #6EE7B7, #3B82F6);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Inter', sans-serif;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      max-width: 28rem;
+      width: 100%;
+      transition: transform 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+    }
+    .btn {
+      background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 15px rgba(91, 83, 83, 0.2);
+    }
+    .result {
+      background: #F3F4F6;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      word-break: break-all;
+      display: none;
+    }
+    .copy-btn {
+      background: #839992;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      transition: background 0.2s ease;
+    }
+    .copy-btn:hover {
+      background: #059669;
+    }
+    .error {
+      color: #EF4444;
+      display: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">ShortLink</h1>
+    <p class="text-center text-gray-600 mb-6">Shorten your URLs in a snap!</p>
+    <form id="urlForm" class="flex flex-col gap-4">
+      <input
+        type="url"
+        id="urlInput"
+        placeholder="Enter your URL (e.g., https://example.com)"
+        class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        required
+      >
+      <button type="submit" class="btn">Shorten URL</button>
+    </form>
+    <p id="error" class="error text-center mt-4">Please enter a valid URL.</p>
+    <div id="result" class="result mt-6">
+      <p class="text-gray-800">Shortened URL:</p>
+      <a id="shortUrl" href="#" target="_blank" class="text-blue-600 underline"></a>
+      <button id="copyBtn" class="copy-btn mt-2">Copy to Clipboard</button>
+    </div>
+  </div>
+
+  <script>
+    const urlForm = document.getElementById('urlForm');
+    const urlInput = document.getElementById('urlInput');
+    const resultDiv = document.getElementById('result');
+    const shortUrlLink = document.getElementById('shortUrl');
+    const copyBtn = document.getElementById('copyBtn');
+    const errorMsg = document.getElementById('error');
+
+    // Simulate URL shortening
+    function shortenUrl(url) {
+      // In a real app, this would call an API to generate a short URL
+      const randomString = Math.random().toString(36).substring(2, 8);
+      return `https://short.link/${randomString}`;
+    }
+
+    // Validate URL
+    function isValidUrl(string) {
+      try {
+        new URL(string);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // Handle form submission
+    urlForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const url = urlInput.value.trim();
+
+      if (!isValidUrl(url)) {
+        errorMsg.style.display = 'block';
+        resultDiv.style.display = 'none';
+        return;
+      }
+
+      errorMsg.style.display = 'none';
+      const shortUrl = shortenUrl(url);
+      shortUrlLink.textContent = shortUrl;
+      shortUrlLink.href = url; // Redirects to original URL
+      resultDiv.style.display = 'block';
+      resultDiv.classList.add('fade-in');
+    });
+
+    // Handle copy to clipboard
+    copyBtn.addEventListener('click', () => {
+      const shortUrl = shortUrlLink.textContent;
+      navigator.clipboard.writeText(shortUrl).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy to Clipboard';
+        }, 2000);
+      });
+    });
+  </script>
+</body>
+</html>
